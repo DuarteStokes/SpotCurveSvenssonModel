@@ -28,14 +28,15 @@ classdef(Abstract) Bond < handle
     
     properties(GetAccess = 'public', SetAccess = 'public')
         cache = struct
-            % Cache structure
-            % Important field: ytm 
+            % Cache structure  
+            % Important field: bondMaturity (scalar) 
+            % Important field: ytm (scalar) 
             % ytm stands for yield to maturity
             % ytm is measured with continuous compounding
             % ytm is stated in percentage
     end
     
-    methods(Access = 'private')
+    methods(Access = 'protected')
         function construction_private_method(self, ID, lastPrice, ...
             maturityDate) 
         %------------------------------------------------------------------
@@ -68,7 +69,7 @@ classdef(Abstract) Bond < handle
                 error(message)
             end
         end
-        
+
         function compute_bondMaturity(self)
         % Financial Toolbox required
         %------------------------------------------------------------------

@@ -1,6 +1,6 @@
 
 classdef(Sealed) ImportExcel < handle
-% Tool used to import content from Microsoft Excel to MATLAB
+% Import content from Microsoft Excel
     
     properties(GetAccess = 'public', SetAccess = 'immutable')
         folderPath
@@ -22,13 +22,13 @@ classdef(Sealed) ImportExcel < handle
             % Important field: data
     end
 
-    methods(Access = public)
+    methods(Access = 'public')
         function self = ImportExcel(folderPath, workbook_name, ...
             workbook_extension, worksheetName, rangeName, variableType)
         % Class constructor
         %------------------------------------------------------------------
             if nargin < 6
-                message = 'Not enough arguments';
+                message = 'Not enough input arguments';
                 error(message) % Generate error
             end
             
@@ -44,7 +44,7 @@ classdef(Sealed) ImportExcel < handle
             cell_array{6, 1} = variableType;
             
             % Make sure that all cells within cell_array contain a string
-            for i = 1:numel(cell_array)
+            for i = 1:numel(cell_array) % For each cell...
                 if not(ischar(cell_array{i, 1}))
                     message = 'Wrong data type';
                     error(message)
@@ -52,17 +52,17 @@ classdef(Sealed) ImportExcel < handle
             end
             
             % Specific workbook_extension test
-            logical_condition_1 = strcmp(workbook_extension, 'xlsx');
-            logical_condition_2 = strcmp(workbook_extension, 'xlsm');
-            if logical_condition_1 == false && logical_condition_2 == false
+            c1 = strcmp(workbook_extension, 'xlsx');
+            c2 = strcmp(workbook_extension, 'xlsm');
+            if c1 == false && c2 == false
                 message = 'workbook_extension input error';
                 error(message)
             end
             
             % Specific variableType test
-            logical_condition_1 = strcmp(variableType, 'matrix');
-            logical_condition_2 = strcmp(variableType, 'cell_array');
-            if logical_condition_1 == false && logical_condition_2 == false
+            c1 = strcmp(variableType, 'matrix');
+            c2 = strcmp(variableType, 'cell_array');
+            if c1 == false && c2 == false
                 message = 'variableType input error';
                 error(message)
             end
@@ -78,10 +78,10 @@ classdef(Sealed) ImportExcel < handle
         
         function import_data(self)
             % Character array concatenation
-            filename = [self.folderPath,'\',self.workbook.name,'.', ...
+            filename = [self.folderPath, '\', self.workbook.name, '.', ...
                 self.workbook.extension]; 
             
-            % Display
+            % Display filename
             display(['filename: ',filename])
             
             % Import Excel range

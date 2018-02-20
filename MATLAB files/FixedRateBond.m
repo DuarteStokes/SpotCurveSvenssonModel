@@ -43,8 +43,15 @@ classdef(Sealed) FixedRateBond < Bond
                 message = 'couponFrequency input error';
                 error(message)
             end
+            
+            %--------------------------------------------------------------
+            
+            % Call private method
+            self.main_method()
         end
-        
+    end    
+       
+    methods(Access = 'private')
         function main_method(self)
             self.compute_bondMaturity()
             self.compute_cashflows_maturities()
@@ -53,7 +60,7 @@ classdef(Sealed) FixedRateBond < Bond
         end
     end
     
-    methods(Access = 'private')
+    methods(Access = 'private') 
         function compute_cashflows_maturities(self)
             % Compute time interval (measured in years) between payments
             time_interval_between_payments = 1 / self.couponFrequency;
@@ -67,7 +74,7 @@ classdef(Sealed) FixedRateBond < Bond
                 modifiable_cashflow_maturity > ...
                 time_interval_between_payments;
             
-            while increase_cashflows_counter == true
+            while increase_cashflows_counter == 1
                 % Update cashflows_counter
                 cashflows_counter = cashflows_counter + 1;
                
@@ -82,13 +89,13 @@ classdef(Sealed) FixedRateBond < Bond
                     time_interval_between_payments;
             end
             
-            % Generate cashflows maturities vector
+            % Generate cashflows' maturities (column) vector
             self.cache.cashflows.maturities = ...
                 zeros(cashflows_counter, 1);
             
             %--------------------------------------------------------------
             
-            % Populate cashflows maturities vector
+            % Populate cashflows' maturities vector
             
             self.cache.cashflows.maturities(1) = ...
                 modifiable_cashflow_maturity;
@@ -101,13 +108,13 @@ classdef(Sealed) FixedRateBond < Bond
                 end
             end
         end
-        
+                 
         function compute_cashflows_values(self) 
             % Compute coupon payment
             coupon_payment = self.faceValue * ...
                 (self.annualCouponRate / 100) / self.couponFrequency;
-               
-            % Generate cashflows values vector
+              
+            % Generate cashflows' values vector
             self.cache.cashflows.values = repmat(coupon_payment, ...
                 size(self.cache.cashflows.maturities));
             
@@ -120,7 +127,7 @@ classdef(Sealed) FixedRateBond < Bond
             % Objective function handle
             ytm_objective_function_handle = ...
                 @(ytm) ytm_objective_function(self, ytm);
-            
+                       
             % Define starting value 
             self.cache.ytm.x0 = 0;
             
@@ -132,7 +139,7 @@ classdef(Sealed) FixedRateBond < Bond
     end
     
     methods(Access = 'private')
-        function f = ytm_objective(self, ytm)
+        function f = ytm_objective_function(self, ytm)
             % Compute discount factors
             discount_factors = exp( ...
                 (-1) * (ytm / 100) * ...
