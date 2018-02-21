@@ -12,7 +12,7 @@ classdef(Sealed) Optimization < handle
         exitflag
             % Optimization exitflag (scalar)
         output = struct
-            % Optimization output
+            % Optimization output (structure)
         minimizersMatrix    
             % Minimizers matrix
     end

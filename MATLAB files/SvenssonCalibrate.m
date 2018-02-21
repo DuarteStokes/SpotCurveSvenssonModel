@@ -97,11 +97,11 @@ classdef(Sealed) SvenssonCalibrate < handle
             % Exploit limiting cases
             
             shortest_maturity_bond_ytm = ...
-                self.get_shortest_maturity_bond_ytm();
-            
+                self.find_shortest_maturity_bond_ytm();
+                          
             longest_maturity_bond_ytm = ...
-                self.get_longest_maturity_bond_ytm();
-            
+                self.find_longest_maturity_bond_ytm();
+                        
             %--------------------------------------------------------------
             
             % Populate vector
@@ -118,8 +118,10 @@ classdef(Sealed) SvenssonCalibrate < handle
             self.cache.x0(5) = 1.4;  
             self.cache.x0(6) = 1;
         end
-           
+                 
         function define_optimization_bounds(self)
+        % Reference: http://comisef.eu/files/wps031.pdf (page 13)
+        %------------------------------------------------------------------
             % Vector of lower bounds
             self.cache.lb = [0; -15; -30; -30; eps(1); 2.5];
             
@@ -137,7 +139,7 @@ classdef(Sealed) SvenssonCalibrate < handle
                 'MaxFunEvals', Inf, 'MaxIter', Inf, ...
                 'TolFun', 1e-7, 'TolX', 1e-7, 'UseParallel', false);
         end
-        
+            
         function define_optimization_problem(self)
             % Create optimization problem structure
             problem.objective = @(x) compute_objective_function(self, x);
@@ -155,21 +157,29 @@ classdef(Sealed) SvenssonCalibrate < handle
             % Store in cache
             self.cache.problem = problem;
         end
-        
+                 
         function define_global_optimization_algorithm_options(self)
+        % Parallel Computing Toolbox required    
         % Global Optimization Toolbox required
         %------------------------------------------------------------------
+            % Allow parallel computing
+            distcomp.feature('LocalUseMpiexec', false)
+            clc
+        
+            % Seed the random number generator based on the current time
+            rng('shuffle')
+            
             % Construct MultiStart object
             self.cache.objMultiStart = MultiStart('Display', 'off', ...
                 'MaxTime', Inf, 'StartPointsToRun', 'bounds', ...
                 'TolFun', 1e-7, 'TolX', 1e-7, 'UseParallel', true);
         end
-        
+                 
         function solve_optimization_problem(self)
         %------------------------------------------------------------------    
             % Preallocation
             self.cache.objArrayOptimization(2, 1) = Optimization();
-            
+                       
             %--------------------------------------------------------------
             
             % Nelson-Siegel model calibration 
@@ -224,52 +234,55 @@ classdef(Sealed) SvenssonCalibrate < handle
             % New figure
             figure 
             
+            % Horizontal axis
             x_axis_lb = 0.01;
             x_axis_step = x_axis_lb;
-            x_axis_ub = max(30, max(self.cache.bondMaturity_vector));
+            x_axis_ub = max(30, max(self.cache.bondMaturity_vector) + 5);
             x_axis = transpose(x_axis_lb : x_axis_step : x_axis_ub);
             
             %--------------------------------------------------------------
             
-            % Nelson-Siegel model zero curve plot
+            % Nelson-Siegel zero curve plot
             
             self.cache.modelParameters = ...
                 self.cache.objArrayOptimization(1).bestMinimizer;
             
-            nelson_siegel_y_axis = self.compute_spot_rates(x_axis);
+            nelson_siegel_spot_rates = self.compute_spot_rates(x_axis);
             
-            plot(x_axis, nelson_siegel_y_axis, 'r')
+            plot(x_axis, nelson_siegel_spot_rates, 'r')
             
             %--------------------------------------------------------------
             
-            % Svensson model zero curve plot
+            % Svensson zero curve plot
             
             self.cache.modelParameters = ...
                 self.cache.objArrayOptimization(2).bestMinimizer;
-            
-            svensson_y_axis = self.compute_spot_rates(x_axis);
+                           
+            svensson_spot_rates = self.compute_spot_rates(x_axis);
             
             grid on
             hold on
-            plot(x_axis, svensson_y_axis, 'b')
+            plot(x_axis, svensson_spot_rates, 'b')
             
             %--------------------------------------------------------------
             
             % Yields to maturity plot
             
             hold on
+            
             plot(self.cache.bondMaturity_vector, self.cache.ytm_vector, ...
                 'g*')
             
             %--------------------------------------------------------------
             
             hold on
+            x_axis = [0; x_axis]; 
             plot(x_axis, zeros(size(x_axis)), 'k')
             
-            xlim([0 x_axis_ub])
+            xlim([0 x_axis(end)])
             
-            xlabel('Maturity', 'fontsize', 16)
-            ylabel('Interest rate (%)', 'fontsize', 16)
+            xlabel('Maturity', 'fontsize', 18)
+            ylabel('Interest rate (%)', 'fontsize', 18)
             
             % Enhance code readability
             valuationDate = self.objArrayZeroCouponBond(1).valuationDate;
@@ -280,10 +293,10 @@ classdef(Sealed) SvenssonCalibrate < handle
             title_string = [title_string, ' term structure of '];
             title_string = [title_string, 'interest rates ('];
             title_string = [title_string, datestr(valuationDate), ')'];
-            title(title_string, 'fontsize', 20)
+            title(title_string, 'fontsize', 22)
             
-            legend('Nelson-Siegel zero curve', 'Svensson zero curve', ...
-                'Yields to maturity', 'Location', 'northwest', ...
+            legend({'Nelson-Siegel zero curve', 'Svensson zero curve', ...
+                'Yield to maturity'}, 'Location', 'northwest', ...
                 'Orientation', 'vertical', 'fontsize', 16)
             
             %--------------------------------------------------------------
@@ -300,64 +313,68 @@ classdef(Sealed) SvenssonCalibrate < handle
             % New figure
             figure
             
-            % Create x_axis vector
-            x_axis = transpose(1 : (self.cache.m1 + self.cache.m2));
+            % Horizontal axis
+            x_axis = transpose(0:(self.cache.m1 + self.cache.m2 + 1));
             
-            ---------------------------------------------------------------
+            %--------------------------------------------------------------
             
-            % Nelson-Siegel model residuals plot
+            % Nelson-Siegel residuals plot
             
             % Update cache
             x = self.cache.objArrayOptimization(1).bestMinimizer;
             self.compute_objective_function(x);
             
-            % Concatenate
+            % Concatenate vertically
             nelson_siegel_residuals_vector = [ ...
-                self.cache.ZeroCouponBond_residuals_vector; 
+                self.cache.ZeroCouponBond_residuals_vector; ...
                 self.cache.FixedRateBond_residuals_vector];
             
-            plot(x_axis, nelson_siegel_residuals_vector, 'r*')
+            plot(x_axis(2:end-1), nelson_siegel_residuals_vector, 'r*')
             
             %--------------------------------------------------------------
             
-            % Svensson model residuals plot
+            % Svensson residuals plot
             
             % Update cache
             x = self.cache.objArrayOptimization(2).bestMinimizer;
             self.compute_objective_function(x);
             
-            % Concatenate
+            % Concatenate vertically
             svensson_residuals_vector = [ ...
-                self.cache.ZeroCouponBond_residuals_vector; 
+                self.cache.ZeroCouponBond_residuals_vector; ... 
                 self.cache.FixedRateBond_residuals_vector];
             
             grid on
             hold on
-            plot(x_axis, nelson_siegel_residuals_vector, 'b*')
+            plot(x_axis(2:end-1), svensson_residuals_vector, 'b*')
             
             %--------------------------------------------------------------
             
             hold on
             plot(x_axis, zeros(size(x_axis)), 'k')
             
-            ylabel('Residual', 'fontsize', 16)
+            xlim([x_axis(1) x_axis(end)])
             
-            title('Model calibration residuals', 'fontsize', 20)
-            
-            legend('Nelson-Siegel residuals', 'Svensson residuals', ...
-                'Location', 'northeast', 'Orientation', 'vertical', ...
-                'fontsize', 16)
-            
-            %--------------------------------------------------------------
+            xlabel('Bond #', 'fontsize', 18)
+            ylabel('Residual', 'fontsize', 18)
             
             % Enhance code readability
             valuationDate = self.objArrayZeroCouponBond(1).valuationDate;
             currency = self.objArrayZeroCouponBond(1).currency;
             creditQuality = self.objArrayZeroCouponBond(1).creditQuality;
             
-            filename = [currency, ' ', creditQuality, ' model residuals'];
-            filename = [filename, ' (', datestr(valuationDate), ')'];
-            filename = [folder_path, '\', filename, '.', format];
+            title_string = [currency, ' ', creditQuality];
+            title_string = [title_string, ' residuals ('];
+            title_string = [title_string, datestr(valuationDate), ')'];
+            title(title_string, 'fontsize', 22)
+            
+            legend({'Nelson-Siegel model residuals', ...
+                'Svensson model residuals'}, 'Location', 'northwest', ...
+                'Orientation', 'vertical', 'fontsize', 16)
+            
+            %--------------------------------------------------------------
+            
+            filename = [folder_path, '\', title_string, '.', format];
             
             % Save figure
             saveas(gcf, filename)
@@ -366,7 +383,7 @@ classdef(Sealed) SvenssonCalibrate < handle
     
     methods(Access = 'private')
         function shortest_maturity_bond_ytm = ...
-            get_shortest_maturity_bond_ytm(self)
+            find_shortest_maturity_bond_ytm(self)
         %------------------------------------------------------------------
             % Enhance code readability
             m = self.cache.m1 + self.cache.m2;
@@ -392,25 +409,25 @@ classdef(Sealed) SvenssonCalibrate < handle
                     
                     self.cache.ytm_vector(i) = ...
                         self.objArrayFixedRateBond(i - self.cache.m1). ...
-                        cache.ytm;
+                        cache.ytm.value;
                 end
             end
             
             %--------------------------------------------------------------
             
-            % Find shortest maturity bond ytm
+            % Find the shortest maturity bond yield to maturity
             [~, min_index] = min(self.cache.bondMaturity_vector);
             shortest_maturity_bond_ytm = self.cache.ytm_vector(min_index);
         end                              
         
         function longest_maturity_bond_ytm = ...
-            get_longest_maturity_bond_ytm(self)
+            find_longest_maturity_bond_ytm(self)
         %------------------------------------------------------------------
-            % Find longest maturity bond ytm
+            % Find the longest maturity bond yield to maturity
             [~, max_index] = max(self.cache.bondMaturity_vector);
             longest_maturity_bond_ytm = self.cache.ytm_vector(max_index); 
         end
-
+                     
         function f = compute_objective_function(self, x)
             % Store in cache
             self.cache.modelParameters = x;
@@ -425,18 +442,19 @@ classdef(Sealed) SvenssonCalibrate < handle
             
             %--------------------------------------------------------------
             
-            % Fill vectors
+            % Populate vectors
             
             % Handle zero coupon bonds
             for i = 1:self.cache.m1 % For each zero coupon bond...
                 ZeroCouponBond_market_prices(i) = ...
                     self.objArrayZeroCouponBond(i).lastPrice;
                                                
-                discount_factors = self.compute_discount_factors( ...
+                discount_factor = self.compute_discount_factors( ...
                     'ZeroCouponBond', i);
 
-                ZeroCouponBond_model_prices(i) = self. ...
-                    objArrayZeroCouponBond(i).faceValue * discount_factors;
+                ZeroCouponBond_model_prices(i) = ...
+                    self.objArrayZeroCouponBond(i).faceValue * ...
+                    discount_factor;
             end
             
             % Handle fixed rate bonds
@@ -475,12 +493,12 @@ classdef(Sealed) SvenssonCalibrate < handle
             % Note that g(y) = sqrt(y) is strictly increasing for all y > 0
             f = sqrt(f);
             
-            % Set field to empty
+            % Set empty
             self.cache.modelParameters = [];
         end
     end
     
-    methods(Access = 'private')
+    methods(Access = 'private') 
         function discount_factors = compute_discount_factors(self, ...
             bond_type, object_array_index)
         %------------------------------------------------------------------    
@@ -512,7 +530,7 @@ classdef(Sealed) SvenssonCalibrate < handle
                     error(message)
             end
         end
-   
+                
         function spot_rates = compute_spot_rates(self, ...
             cashflows_maturities)
         %------------------------------------------------------------------

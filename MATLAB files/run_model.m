@@ -1,7 +1,11 @@
 
+% This script runs the whole model
+
 tic % Measure code performance
 
-folderPath = 'H:\Svensson model\Excel files';
+%--------------------------------------------------------------------------
+
+folderPath = 'E:\Svensson model\Excel files';
 workbook_name = 'Dataset';
 workbook_extension = 'xlsm';
 worksheetName = 'Sheet1';
@@ -17,5 +21,22 @@ objImportExcel.import_data()
 
 objBondCreate = BondCreate(objImportExcel.cache.data);
 objBondCreate.generate_object_arrays()
+objArrayZeroCouponBond = objBondCreate.cache.objArrayZeroCouponBond;
+objArrayFixedRateBond = objBondCreate.cache.objArrayFixedRateBond;
+
+%--------------------------------------------------------------------------
+
+numberLocalSolverRuns = 20000;
+
+objSvenssonCalibrate = SvenssonCalibrate(objArrayZeroCouponBond, ...
+    objArrayFixedRateBond, numberLocalSolverRuns);
+
+objSvenssonCalibrate.calibrate_model
+
+folder_path = 'E:\Svensson model\MATLAB files';
+format = 'fig';
+objSvenssonCalibrate.generate_plots(folder_path, format);
+
+%--------------------------------------------------------------------------
 
 toc
